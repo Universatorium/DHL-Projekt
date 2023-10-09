@@ -3,10 +3,16 @@ import random
 import string
 import time
 from datetime import date
+import json  
 
 # Initialize the DynamoDB resource
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('Orders')  # Replace 'YourTableName' with your table's name
+
+sqs = boto3.client('sqs')
+
+sqs_queue_url = 'https://sqs.eu-central-1.amazonaws.com/732509143253/DHL_driver.fifo'  # Replace with your SQS queue's URL
+
 
 def random_string(length):
     """Generate a random string of fixed length."""
@@ -47,6 +53,26 @@ def lambda_handler(event, context):
 
         # Insert the item into the DynamoDB table
         table.put_item(Item=item)
+        
+        # Send a message to the SQS queue
+        sqs_message = {
+            "packageID": item["packageID"],  # You can customize this message as needed
+            "message": "New package inserted into DynamoDB"
+        }
+        
+        sqs.set_queue_attributes(
+    QueueUrl=sqs_queue_url,
+    Attributes={
+        'ContentBasedDeduplication': 'true'
+    }
+)
+
+
+        sqs_response = sqs.send_message(
+            QueueUrl=sqs_queue_url,
+            MessageBody=json.dumps(sqs_message),
+            MessageGroupId=generate_packageID()
+        )
 
         return {
             'statusCode': 200,

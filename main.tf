@@ -4,16 +4,29 @@ provider "aws" {
 
 #############################Lambda##################################
 
+
+resource "aws_lambda_function" "request_lambda" {
+  function_name = "request-lambda"
+  role          = aws_iam_role.lambda_exec_role.arn
+  handler       = "request.lambda_handler"
+  runtime       = "python3.9"
+
+  filename = "./request_lambda.zip"
+
+  environment {
+    variables = {
+      SQS_QUEUE_URL = aws_sqs_queue.order_queue.id
+    }
+  }
+}
+
 resource "aws_lambda_function" "get_driver" {
   function_name = "getdriverlambda"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "index.lambda_handler" 
   runtime       = "python3.9"  
   
-
   filename = "./getdriver/index.zip"
-
-  
 }
 
 resource "aws_lambda_event_source_mapping" "dynamodb_event_source" {
@@ -52,6 +65,20 @@ resource "aws_lambda_function" "orderput" {
   }
 }
 
+resource "aws_lambda_function" "driverput" {
+  function_name = "createdriver"
+  role          = aws_iam_role.lambda_exec_role.arn
+  handler       = "driver.lambda_handler" 
+  runtime       = "python3.9"
+
+  filename = "./driver/driver.zip"
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE = aws_dynamodb_table.OrderDB.name
+    }
+  }
+}
 
 resource "aws_iam_role" "lambda_exec_role" {
   name = "lambda-exec-role"
@@ -78,24 +105,29 @@ resource "aws_iam_policy" "lambda_policy" {
   name = "lambda-policy"
 
   policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Action   = ["dynamodb:*"],
-      Effect   = "Allow",
-      Resource = "*"
-    },
-    {
-    Action = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents"
-    ],
-    Effect = "Allow",
-    Resource = "arn:aws:logs:::*"
-    }
-    
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:*",
+                "sqs:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogStream",
+                "logs:CreateLogGroup",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:::*"
+        }
     ]
-  })
+})
 }
 
 
@@ -103,6 +135,7 @@ resource "aws_iam_policy" "lambda_policy" {
 
 ############################DynamoDB############################
 
+#1.Table
 resource "aws_dynamodb_table" "OrderDB" {
   name           = "Orders"
   hash_key = "packageID"
@@ -119,4 +152,31 @@ resource "aws_dynamodb_table" "OrderDB" {
   }
 }
 
-###################################################
+#2.Table
+resource "aws_dynamodb_table" "DriverDB" {
+  name           = "Drivers"
+  hash_key = "driverID"
+  read_capacity = 20
+  write_capacity = 20
+
+
+  attribute {
+    name = "driverID"
+    type = "S"
+  }
+}
+
+######################SQS#############################
+
+resource "aws_sqs_queue" "order_queue" {
+  name                      = "order-queue"
+  delay_seconds             = 0
+  max_message_size          = 2048
+  message_retention_seconds = 86400
+  visibility_timeout_seconds = 30
+  fifo_queue                = false # Change to true for FIFO queue
+}
+
+output "sqs_queue_url" {
+  value = aws_sqs_queue.order_queue.id
+}
