@@ -11,7 +11,7 @@ table = dynamodb.Table('Orders')  # Replace 'YourTableName' with your table's na
 
 sqs = boto3.client('sqs')
 
-sqs_queue_url = 'https://sqs.eu-central-1.amazonaws.com/732509143253/DHL_driver.fifo'  # Replace with your SQS queue's URL
+sqs_queue_url = 'aws_sqs_queue.order_queue.id'  # Replace with your SQS queue's URL
 
 
 def random_string(length):

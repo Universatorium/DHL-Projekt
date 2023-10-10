@@ -3,7 +3,11 @@ provider "aws" {
 }
 
 #############################Lambda##################################
-
+data "archive_file" "lambda_code0" {
+  type        = "zip"
+  source_file = "request_lambda.py"  # Pfad zur Python-Datei
+  output_path = "request_lambda.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
+}
 
 resource "aws_lambda_function" "request_lambda" {
   function_name = "request-lambda"
@@ -18,6 +22,12 @@ resource "aws_lambda_function" "request_lambda" {
       SQS_QUEUE_URL = aws_sqs_queue.order_queue.id
     }
   }
+}
+###   Lambda-Funktion zum Senden von Bestellungen an die SQS-Queue
+data "archive_file" "lambda_code1" {
+  type        = "zip"
+  source_file = "./getdriver/index.py"  # Pfad zur Python-Datei
+  output_path = "./getdriver/index.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
 }
 
 resource "aws_lambda_function" "get_driver" {
@@ -49,7 +59,11 @@ resource "aws_lambda_event_source_mapping" "dynamodb_event_source" {
   }
 }
 
-
+data "archive_file" "lambda_code2" {
+  type        = "zip"
+  source_file = "./python/orderlambda.py"  # Pfad zur Python-Datei
+  output_path = "./python/orderlambda.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
+}
 resource "aws_lambda_function" "orderput" {
   function_name = "orderlambda"
   role          = aws_iam_role.lambda_exec_role.arn
@@ -63,6 +77,11 @@ resource "aws_lambda_function" "orderput" {
       DYNAMODB_TABLE = aws_dynamodb_table.OrderDB.name
     }
   }
+}
+data "archive_file" "lambda_code3" {
+  type        = "zip"
+  source_file = "./driver/driver.py"  # Pfad zur Python-Datei
+  output_path = "./driver/driver.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
 }
 
 resource "aws_lambda_function" "driverput" {
@@ -169,12 +188,12 @@ resource "aws_dynamodb_table" "DriverDB" {
 ######################SQS#############################
 
 resource "aws_sqs_queue" "order_queue" {
-  name                      = "order-queue"
+  name                      = "order-queue.fifo"
   delay_seconds             = 0
   max_message_size          = 2048
   message_retention_seconds = 86400
   visibility_timeout_seconds = 30
-  fifo_queue                = false # Change to true for FIFO queue
+  fifo_queue                = true
 }
 
 output "sqs_queue_url" {
