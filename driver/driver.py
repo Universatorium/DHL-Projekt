@@ -15,7 +15,9 @@ def lambda_handler(event, context):
         item = {
             "driverID": {"S": driver_id},
             "Name": {"S": driver_name},
-            "Verfügbarkeit": {"S": availability}
+            "Verfügbarkeit": {"S": availability},
+            "Email": {"S": "matthias.bandholtz@docc.techstarter.de"}
+
         }
 
         try:

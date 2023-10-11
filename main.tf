@@ -5,17 +5,17 @@ provider "aws" {
 #############################Lambda##################################
 data "archive_file" "lambda_code0" {
   type        = "zip"
-  source_file = "request_lambda.py"  # Pfad zur Python-Datei
-  output_path = "request_lambda.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
+  source_file = "./python/request.py"  # Pfad zur Python-Datei
+  output_path = "./python/request.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
 }
 
-resource "aws_lambda_function" "request_lambda" {
+resource "aws_lambda_function" "request" {
   function_name = "request-lambda"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "request.lambda_handler"
   runtime       = "python3.9"
 
-  filename = "./request_lambda.zip"
+  filename = "./python/request.zip"
 
   environment {
     variables = {
@@ -24,24 +24,10 @@ resource "aws_lambda_function" "request_lambda" {
   }
 }
 ###   Lambda-Funktion zum Senden von Bestellungen an die SQS-Queue
-data "archive_file" "lambda_code1" {
-  type        = "zip"
-  source_file = "./getdriver/index.py"  # Pfad zur Python-Datei
-  output_path = "./getdriver/index.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
-}
-
-resource "aws_lambda_function" "get_driver" {
-  function_name = "getdriverlambda"
-  role          = aws_iam_role.lambda_exec_role.arn
-  handler       = "index.lambda_handler" 
-  runtime       = "python3.9"  
-  
-  filename = "./getdriver/index.zip"
-}
 
 resource "aws_lambda_event_source_mapping" "dynamodb_event_source" {
   event_source_arn = aws_dynamodb_table.OrderDB.stream_arn
-  function_name    = aws_lambda_function.get_driver.arn
+  function_name    = aws_lambda_function.request.arn
   starting_position = "LATEST"
 
   # Set batch_size to 1 to process each event individually
@@ -99,6 +85,28 @@ resource "aws_lambda_function" "driverput" {
   }
 }
 
+data "archive_file" "lambda_code4" {
+  type        = "zip"
+  source_file = "./python/sns.py"  # Pfad zur Python-Datei
+  output_path = "./python/sns.zip" # Pfad, wohin das ZIP-Archiv gepackt werden soll
+}
+resource "aws_lambda_function" "sns" {
+  function_name = "sns-lambda"
+  role          = aws_iam_role.lambda_exec_role.arn
+  handler       = "sns.lambda_handler"
+  runtime       = "python3.9"
+
+  filename = "./python/sns.zip"
+
+  environment {
+    variables = {
+      SQS_QUEUE_URL = aws_sqs_queue.order_queue.id
+      SNS_TOPIC_ARN = aws_sns_topic.driver.arn
+    }
+  }
+}
+
+#####################################################################
 resource "aws_iam_role" "lambda_exec_role" {
   name = "lambda-exec-role"
 
@@ -131,7 +139,8 @@ resource "aws_iam_policy" "lambda_policy" {
             "Effect": "Allow",
             "Action": [
                 "dynamodb:*",
-                "sqs:*"
+                "sqs:*",
+                "sns:*"
             ],
             "Resource": "*"
         },
@@ -148,9 +157,6 @@ resource "aws_iam_policy" "lambda_policy" {
     ]
 })
 }
-
-
-
 
 ############################DynamoDB############################
 
@@ -184,8 +190,7 @@ resource "aws_dynamodb_table" "DriverDB" {
     type = "S"
   }
 }
-
-######################SQS########################
+######################SQS######################################
 
 resource "aws_sqs_queue" "order_queue" {
   name                      = "order-queue.fifo"
@@ -195,7 +200,48 @@ resource "aws_sqs_queue" "order_queue" {
   visibility_timeout_seconds = 30
   fifo_queue                = true
 }
+# resource "aws_iam_policy" "sqs_policy" {
+#   name = "sqs-policy"
+
+#   policy = jsonencode({
+#     Version = "2012-10-17",
+#     Statement = [
+#       {
+#         Action = [
+#           "sqs:SendMessage",
+#           "sqs:ReceiveMessage",
+#           "sqs:DeleteMessage",
+#           "sqs:GetQueueAttributes",
+#           "sqs:GetQueueUrl",
+#         ],
+#         Effect   = "Allow",
+#         Resource = aws_sqs_queue.order_queue.arn
+#       },
+#     ],
+#   })
+# }
+# resource "aws_iam_policy_attachment" "sqs_exec_policy" {
+#   name = "Lambda-SQS"
+#   policy_arn = aws_iam_policy.sqs_policy.arn
+#   roles      = [aws_iam_role.lambda_exec_role.name]
+# }
 
 output "sqs_queue_url" {
   value = aws_sqs_queue.order_queue.id
 }
+###########################SNS##################################
+
+resource "aws_sns_topic" "driver" {
+  name = "driver-topic"
+}
+
+resource "aws_sns_topic_subscription" "email_subscription" {
+  topic_arn = aws_sns_topic.driver.arn
+  protocol  = "email"
+  endpoint  = "matthias.bandholtz@docc.techstarter.de" # Ihre E-Mail-Adresse hier
+}
+
+output "sns_topic_arn" {
+  value = aws_sns_topic.driver.arn
+}
+################################################################

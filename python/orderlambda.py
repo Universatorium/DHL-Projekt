@@ -10,8 +10,8 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('Orders')  # Replace 'YourTableName' with your table's name
 
 sqs = boto3.client('sqs')
-
-sqs_queue_url = 'aws_sqs_queue.order_queue.id'  # Replace with your SQS queue's URL
+message_group_id = "order-sqs-group"
+sqs_queue_url = 'aws_sqs_queue.order_queue.id'
 
 
 def random_string(length):
@@ -48,7 +48,8 @@ def lambda_handler(event, context):
             "insurance_type": random.choice(["Basic", "Premium", "Gold"]),
             "insurance_value": random.randint(1, 5000),
             "restrictions": random.choice(["Sperrgut", "Zerbrechlich", "Liquid", "Flammable"]),  # Two random restrictions
-            "value": random.randint(1, 1000)
+            "value": random.randint(1, 1000),
+            "deliverystatus": "pending"
         }
 
         # Insert the item into the DynamoDB table
@@ -66,7 +67,6 @@ def lambda_handler(event, context):
         'ContentBasedDeduplication': 'true'
     }
 )
-
 
         sqs_response = sqs.send_message(
             QueueUrl=sqs_queue_url,

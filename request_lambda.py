@@ -1,5 +1,6 @@
 import boto3
 import json
+import os
 
 # Initialisieren Sie den SQS-Client
 sqs = boto3.client('sqs', region_name='eu-central-1')
@@ -8,7 +9,7 @@ sqs = boto3.client('sqs', region_name='eu-central-1')
 dynamodb = boto3.client('dynamodb', region_name='eu-central-1')
 
 # Definieren Sie den Namen der SQS-Warteschlange und der DynamoDB-Tabelle
-sqs_queue_url = 'https://sqs.eu-central-1.amazonaws.com/732509143253/DHL_driver.fifo'
+sqs_queue_url = os.environ.get('SQS_QUEUE_URL')
 dynamodb_table_name = 'Driver'
 
 
