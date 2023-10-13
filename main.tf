@@ -152,7 +152,7 @@ resource "aws_iam_policy" "lambda_policy" {
                 "logs:CreateLogGroup",
                 "logs:PutLogEvents"
             ],
-            "Resource": "arn:aws:logs:::*"
+            "Resource": "arn:aws:logs:*:*:*:*"
         }
     ]
 })
